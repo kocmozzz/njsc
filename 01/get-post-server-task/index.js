@@ -35,10 +35,7 @@ const writeFile = require('./write_file');
 const fileRegExp = /^\/{1}[\w\-а-яА-я]+\.\w+/gi;
 
 const server = require('http').createServer((req, res) => {
-  try {
-    const pathname = decodeURI(url.parse(req.url).pathname);
-  } catch(err) {}
-  
+  const pathname = decodeURI(url.parse(req.url).pathname);
 
   switch (req.method) {
     case 'GET':

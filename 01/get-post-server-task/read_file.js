@@ -5,7 +5,7 @@ const { getMeta } = require('./file_meta');
 function errorHandler(err, res) {
   process.env.NODE_ENV === 'develop' && console.log(err);
 
-  if (err.code === 'ENOENT' || err.code === 'EISDIR') {
+  if (err && (err.code === 'ENOENT' || err.code === 'EISDIR')) {
     res.statusCode = 404;
     res.end('File not found');
   } else {

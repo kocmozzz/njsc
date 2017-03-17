@@ -1,7 +1,7 @@
 const path = require('path');
 const fs = require('fs');
 
-const MAX_FILE_SIZE = 10e6;
+const MAX_FILE_SIZE = 1e6;
 
 const { WriteStream } = fs;
 
