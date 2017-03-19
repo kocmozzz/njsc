@@ -15,7 +15,7 @@ function errorHandler(err, res) {
 }
 
 module.exports = function readFile(filePath, res) {
-  filePath = path.normalize(path.join(__dirname, filePath));
+  filePath = path.normalize(filePath);
 
   const { encoding, contentType } = getMeta(filePath);
   const stream = new ReadStream(filePath, { encoding });

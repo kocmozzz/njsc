@@ -23,10 +23,7 @@
 
  */
 
-const SERVER_PORT = 3000;
-const INDEX_PATH = '/public/index.html';
-const FILES_PATH = '/public/files/';
-
+const config = require('config');
 const url = require('url');
 const path = require('path');
 const readFile = require('./read_file');
@@ -40,11 +37,11 @@ const server = require('http').createServer((req, res) => {
   switch (req.method) {
     case 'GET':
       if (pathname === '/') {
-        return readFile(INDEX_PATH, res);
+        return readFile(path.join(config.get('publicRoot'), 'index.html'), res);
       }
 
       if (pathname.match(fileRegExp)) {
-        readFile(path.join(FILES_PATH, pathname), res);
+        readFile(path.join(config.get('filesRoot'), pathname), res);
       } else {
         res.statusCode = 400;
         res.end('Bad request');
@@ -53,7 +50,7 @@ const server = require('http').createServer((req, res) => {
       break;
 
     case 'POST':
-      writeFile(path.join(FILES_PATH, pathname), req, res);
+      writeFile(path.join(config.get('filesRoot'), pathname), req, res);
 
       break;
 
@@ -61,14 +58,17 @@ const server = require('http').createServer((req, res) => {
       res.statusCode = 502;
       res.end('Not implemented');
   }
-}).listen(SERVER_PORT, () => {
-  if (process.env.NODE_ENV === 'develop') {
-    const emit = server.emit;
-    server.emit = (...args) => {
-      console.log(args[0]);
-      return emit.apply(server, args);
-    };
-
-    console.log(`Staring server on port ${SERVER_PORT}`);
-  }
 });
+// .listen(config.get('serverPort'), () => {
+//   if (process.env.NODE_ENV === 'develop') {
+//     const emit = server.emit;
+//     server.emit = (...args) => {
+//       console.log(args[0]);
+//       return emit.apply(server, args);
+//     };
+
+//     console.log(`Staring server on port ${SERVER_PORT}`);
+//   }
+// });
+
+module.exports = server;

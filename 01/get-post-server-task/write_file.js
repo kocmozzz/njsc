@@ -1,18 +1,20 @@
 const path = require('path');
 const fs = require('fs');
+const config = require('config');
 
-const MAX_FILE_SIZE = 1e6;
+const MAX_FILE_SIZE = config.get('limitFileSize');
 
 const { WriteStream } = fs;
 
 module.exports = function writeFile(filepath, req, res) {
   if (req.headers['content-length'] > MAX_FILE_SIZE) {
+    console.log(req.headers['content-length']);
     res.statusCode = 413;
     res.end('File is too big.');
     return;
   }
 
-  const filePath = path.normalize(path.join(__dirname, filepath));
+  const filePath = path.normalize(filepath);
   const stream = new WriteStream(filePath, { flags: 'wx' });
   let size = 0;
 
@@ -24,10 +26,14 @@ module.exports = function writeFile(filepath, req, res) {
       } else {
         stream.desroy();
 
-        fs.unlink(filePath);
+        if (!res.headersSent) {
+          res.writeHead(500, { 'Connection': 'close' });
+        }
 
         res.statusCode = 500;
         res.end('File upload error');
+
+        fs.unlink(filePath);
       }
     })
     .on('close', () => { res.end('File uploaded'); });
@@ -37,6 +43,7 @@ module.exports = function writeFile(filepath, req, res) {
       size += chunk.length;
 
       if (size > MAX_FILE_SIZE) {
+        console.log('summ: ' + size);
         fs.unlink(filePath);
         res.setHeader('Connection', 'close');
         res.statusCode = 413;
