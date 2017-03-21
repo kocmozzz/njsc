@@ -1,5 +1,3 @@
-console.log(process.cwd());
-
 module.exports = {
   serverPort: 3000,
   publicRoot: `${process.cwd()}/public`,
