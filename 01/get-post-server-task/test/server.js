@@ -4,7 +4,7 @@ const server = require('../server');
 const chai = require('chai');
 const chaiHttp = require('chai-http');
 const config = require('config');
-const fs = require('fs');
+const fs = require('fs-extra');
 const path = require('path');
 const rp = require('request-promise');
 
@@ -21,108 +21,98 @@ describe('File server suite', () => {
     server.listen(config.get('serverPort'), '127.0.0.1', done);
   });
 
-  // after((done) => {
-  //   fs.unlinkSync(path.join(config.get('filesRoot'), testFileName));
-  //   done();
-  // });
-
-  // добавить beforeEach с очисткой директории
-  // перед тем как проверить получение файла надо его положить в папку из fixtures
-
-
-  it('GET /file2.json should return file2.json', async () => {
-    const fixtureContent = fs.readFileSync(path.join(config.get('filesRoot'), 'file1.txt'));
-
-    const body = await rp.get(`${host}/file1.txt`);
-    body.should.equals(fixtureContent.toString());
+  after((done) => {
+    server.close(done);
+    fs.emptyDirSync(config.get('filesRoot'));
   });
 
-  // it('GET /file1.txt should return file1.txt', (done) => {
-  //   app
-  //     .get('/file1.txt')
-  //     .end((err, res) => {
-  //       res.should.have.status(200);
-  //       res.should.be.text;
-  //       // проверки кода и контент тайп недостаточно, надо сверять body
-  //       done();
-  //     });
-  // });
+  beforeEach(() => {
+    fs.emptyDirSync(config.get('filesRoot'));
+  });
 
-  // it('GET /file2.txt should return 404', (done) => {
-  //   app
-  //     .get('/file2.txt')
-  //     .end((err, res) => {
-  //       res.should.have.status(404);
-  //       done();
-  //     });
-  // });
+  describe(`GET /${testFileName}`, () => {
+    context("When exists", () => {
+      beforeEach(() => {
+        fs.copySync(
+          `${config.get('fixturesRoot')}/${testFileName}`,
+          `${config.get('filesRoot')}/${testFileName}`
+          );
+      });
 
-  // it('GET /filedir should return 400', (done) => {
-  //   app
-  //     .get('/filedir')
-  //     .end((err, res) => {
-  //       res.should.have.status(400);
-  //       done();
-  //     });
-  // });
+      it('returns 200 ok and file', async () => {
+        const fixtureContent = fs.readFileSync(`${config.get('filesRoot')}/${testFileName}`);
 
-  // it('GET /.. should return 400', (done) => {
-  //   app
-  //     .get('/..')
-  //     .end((err, res) => {
-  //       res.should.have.status(400);
-  //       done();
-  //     });
-  // });
+        const body = await rp.get(`${host}/${testFileName}`);
+        body.should.be.equals(fixtureContent.toString());
+      });
+    });
 
-  // it('GET ///file.txt should return 400', (done) => {
-  //   app
-  //     .get('///file.txt')
-  //     .end((err, res) => {
-  //       res.should.have.status(400);
-  //       done();
-  //     });
-  // });
+    context("When not found", () => {
+      it("returns 404", async () => {
+        try {
+          await rp.get(`${host}/${testFileName}`);
+        } catch (e) {
+          e.statusCode.should.be.equal(404);
+        }
+      });
+    });
+  });
 
-  // it(`POST /${testFileName} should upload file to public/files folder with name ${testFileName}`, (done) => {
-  //   app
-  //     .post(`/${testFileName}`)
-  //     .attach('file', fs.readFileSync(path.join(config.get('fixturesRoot'), testFileName)), testFileName)
-  //     .end((err) => {
-  //       const result = fs.existsSync(path.join(config.get('filesRoot'), testFileName));
-  //       result.should.equal(true);
-  //       done();
-  //     });
-  // });
+  describe('GET folder path /somefile', () => {
+    it('returns 400', async () => {
+      try {
+        await rp.get(`${host}/somefile`);
+      } catch (e) {
+        e.statusCode.should.be.equal(400);
+      }
+    });
+  });
 
-  // it(`POST /${testFileFail} should fail upload file with name ${testFileFail} with status code 413`, (done) => {
-  //   app
-  //     .post(`/${testFileFail}`)
-  //     .attach('file', fs.readFileSync(path.join(config.get('fixturesRoot'), testFileFail)), testFileFail)
-  //     .end((err, res) => {
-  //       res.should.have.status(413);
-  //       done();
-  //     });
-  // });
+  describe('POST /file.ext', () => {
+    context('When exists and valid size', () => {
+      beforeEach(() => {
+        fs.copySync(
+          `${config.get('fixturesRoot')}/${testFileName}`,
+          `${config.get('filesRoot')}/${testFileName}`
+          );
+      });
 
-  // // как отпраивть файл без заголовка "Content-length"?
-  // it(`POST /${testFileFail} should fail upload file with name ${testFileFail} without "Content-type" header with status code 413`, (done) => {
-  //   app
-  //     .post(`/${testFileFail}`)
-  //     .send(fs.readFileSync(path.join(config.get('fixturesRoot'), testFileFail)))
-  //     .end((err, res) => {
-  //       res.should.have.status(413);
-  //       done();
-  //     });
-  // });
+      it('returns 409 and file not modified', async () => {
+        const { mtime } = fs.statSync(`${config.get('filesRoot')}/${testFileName}`);
 
-  // it(`POST /${testFileName} should fail to upload file to public/files folder with name ${testFileName} with status code 409`, (done) => {
-  //   app
-  //     .post(`/${testFileName}`)
-  //     .attach('file', fs.readFileSync(path.join(config.get('fixturesRoot'), testFileName)), testFileName)
-  //     .end((err, res) => {
-  //       res.should.have.status(409);
-  //       done();
-  //     });
-  // });
+        try {
+          await rp.post(`${host}/${testFileName}`);
+        } catch (e) {
+          const { mtime: newMtime } = fs.statSync(`${config.get('filesRoot')}/${testFileName}`);
+
+          mtime.should.eql(newMtime);
+          e.statusCode.should.be.equal(409);
+        }
+      });
+    });
+
+    context('When file is too big', () => {
+      it('returns 413 and no file appears', async () => {
+        try {
+          await rp.post(`${host}/${testFileFail}`, {
+            body: fs.readFileSync(`${config.get('fixturesRoot')}/${testFileFail}`)
+          });
+        } catch (e) {
+          e.statusCode.should.be.equal(413);
+          fs.existsSync(`${config.get('filesRoot')}/${testFileFail}`).should.equals(false);
+        }
+      });
+    });
+
+    context('otherwise', () => {
+      it('returns 200 and file appears', async () => {
+        await rp.post(`${host}/${testFileName}`, {
+          body: fs.readFileSync(`${config.get('fixturesRoot')}/${testFileName}`)
+        });
+
+        fs.readFileSync(`${config.get('filesRoot')}/${testFileName}`).toString()
+          .should.equals(fs.readFileSync(`${config.get('fixturesRoot')}/${testFileName}`).toString());
+      });
+    });
+  });
 });
