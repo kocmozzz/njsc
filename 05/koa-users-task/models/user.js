@@ -1,9 +1,4 @@
 const mongoose = require('../db/mongoose');
-const beautifyUnique = require('mongoose-beautiful-unique-validation');
-
-const { ObjectId } = mongoose.Schema;
-
-mongoose.plugin(beautifyUnique);
 
 const userSchema = new mongoose.Schema({
   email: {
@@ -21,10 +16,14 @@ const userSchema = new mongoose.Schema({
   },
   displayName: {
     type:       String,
-    required:   'Укажите displayName'
+    required:   'Укажите displayName',
+    trim: true
   }
 }, {
   timestamps: true
 });
+
+// для этого есть отдельный плагин
+userSchema.statics.publicFields = ['email', 'displayName'];
 
 module.exports = mongoose.model('User', userSchema);

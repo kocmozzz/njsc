@@ -7,11 +7,10 @@ if (process.env.TRACE) {
 const mongoose = require('./db/mongoose');
 const Koa = require('koa');
 const User = require('./models/user');
-
-const { ObjectId } = mongoose.Schema;
-const app = new Koa();
-
+const pick = require('lodash/pick');
 const config = require('config');
+
+const app = new Koa();
 
 // keys for in-koa KeyGrip cookie signing (used in session, maybe other modules)
 app.keys = [config.secret];
@@ -27,89 +26,60 @@ handlers.forEach(handler => require('./handlers/' + handler).init(app));
 
 const Router = require('koa-router');
 
-const router = new Router();
-
-router.get('/users', async (ctx) => {
-  const users = await User.find();
-
-  ctx.body = users;
+const router = new Router({
+  prefix: '/users'
 });
 
-function createErrorJson(e) {
-  return {
-    errors: { [e.name || 'error']: e.message || 'unknown error' }
-  };
-}
-
-router.get('/users/:id', async (ctx) => {
-  // как правильно обрабатывать неправильный тип id? просто 404?
-  try {
-    const user = await User.findById(ctx.params.id);
-    if (!user) ctx.throw(404);
-    ctx.body = user;
-  } catch (e) {
-    ctx.response.body = createErrorJson(e);
-    ctx.response.status = e.status || 400;
+router.param('userById', async (id, ctx, next) => {
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    ctx.throw(404);
   }
-});
 
-router.post('/users', async (ctx) => {
-  try {
-    const { body } = ctx.request;
-    delete body._id; // ну такое...
+  ctx.userById = await User.findById(id);
 
-    ctx.body = await User.create(body);
-  } catch (e) {
-    if (e.errors) {
-      const errors = Object.keys(e.errors).reduce((res, key) => {
-        res[key] = e.errors[key].message;
-        return res;
-      }, {});
+  !ctx.userById && ctx.throw(404);
 
-      ctx.response.body = errors;
-      ctx.response.status = 400;
-    } else {
-      ctx.response.body = createErrorJson(e);
-      ctx.response.status = e.status || 400;
+  await next();
+})
+  .get('/', async (ctx) => {
+    const users = await User.find();
+
+    ctx.body = users.map(user => pick(user.toObject(), User.publicFields));
+  })
+  .get('/:userById', async (ctx) => {
+    ctx.body = pick(ctx.userById.toObject(), User.publicFields);
+  })
+  .post('/', async (ctx) => {
+    try {
+      const user = await User.create(pick(ctx.request.body, User.publicFields));
+
+      ctx.body = user.toObject();
+    } catch (e) {
+      if (e.errors) {
+        const errors = Object.keys(e.errors).reduce((res, key) => {
+          res[key] = e.errors[key].message;
+          return res;
+        }, {});
+
+        ctx.response.body = errors;
+        ctx.response.status = 400;
+      }
     }
-  }
-});
+  })
+  .patch('/:userById', async (ctx) => {
+    Object.assign(ctx.userById, pick(ctx.request.body, User.publicFields));
+    await ctx.userById.save();
 
-router.patch('/users/:id', async (ctx) => {
-  try {
-    const { body } = ctx.request;
-    delete body._id;
-
-    const { nModified } = await User.update({ _id: ObjectId(ctx.params.id) }, { $set: body });
-    !nModified && ctx.throw(404);
-    ctx.response.status = 200;
-  } catch (e) {
-    ctx.response.body = createErrorJson(e);
-    ctx.response.status = e.status || 400;
-  }
-});
-
-router.delete('/users/:id', async (ctx) => {
-  try {
-    const { result } = await User.remove({ _id: ObjectId(ctx.params.id) });
-    !result.n && ctx.throw(404);
-    ctx.response.status = 200;
-  } catch (e) {
-    ctx.response.body = createErrorJson(e);
-    ctx.response.status = e.status || 400;
-  }
-});
-
-router.delete('/users', async (ctx) => {
-  try {
-    const { result } = await User.remove();
-    !result.n && ctx.throw(404);
-    ctx.response.status = 200;
-  } catch (e) {
-    ctx.response.body = createErrorJson(e);
-    ctx.response.status = e.status || 400;
-  }
-});
+    ctx.body = ctx.userById.toObject();
+  })
+  .delete('/:userById', async (ctx) => {
+    await ctx.userById.remove();
+    ctx.body = 'ok';
+  })
+  .delete('/', async (ctx) => {
+    await User.remove();
+    ctx.body = 'ok';
+  });
 
 app.use(router.routes());
 
