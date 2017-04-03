@@ -5,11 +5,11 @@ const User = require('../../models/user');
 
 const jwtOptions = {
   jwtFromRequest: ExtractJwt.fromAuthHeader(),
-  secretOrKey: config.secret
+  secretOrKey: config.get('secret')
 };
 
 passport.use(new JwtStrategy(jwtOptions, (payload, done) => {
-  User.findById(payload.id, (err, user) => {
+  User.find({ email: payload.email }, (err, user) => {
     if (err) {
       return done(err);
     }

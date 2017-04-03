@@ -55,7 +55,7 @@ router.param('userById', async (id, ctx, next) => {
     try {
       const user = await User.create(ctx.request.body);
 
-      ctx.body = user.toObject();
+      ctx.body = pick(user.toObject(), User.publicFields);
     } catch (e) {
       if (e.errors) {
         const errors = Object.keys(e.errors).reduce((res, key) => {
@@ -87,9 +87,10 @@ router.post('/login', async (ctx, next) => {
   await passport.authenticate('local', (err, user) => {
     !user && ctx.throw(403);
 
-    const token = jwt.sign(user, config.secret);
+    const data = pick(user.toObject(), User.publicFields);
+    const token = jwt.sign(data, config.get('secret'));
 
-    ctx.body = { user: pick(user.toObject(), User.publicFields), token };
+    ctx.body = { user: data, token };
   })(ctx, next);
 });
 
